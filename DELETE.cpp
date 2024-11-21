@@ -1,6 +1,7 @@
 #include "DELETE.h"
 
-bool ExistColonk(const string& tableName, const string& columnName, Node* Tablehead) {
+//Функция EXISTCOL проверяет, существует ли указанная колонка в заданной таблице в структуре данных, представляющей базу данных.
+bool EXISTCOL(const string& tableName, const string& columnName, Node* Tablehead) {
     if (!Tablehead) {
         cerr << "Ошибка: Список таблиц пуст.\n";
         return false;
@@ -33,8 +34,8 @@ bool ExistColonk(const string& tableName, const string& columnName, Node* Tableh
 }
 
 
-// Функция для парсинга WHERE части команды
-bool parseWhereClause(istringstream& iss2, string& table, string& column, string& value, const string& tableName, const TableJson& json_table) {
+// Функция разбирающая корректность выполнения условие WHERE
+bool CORWHERE(istringstream& iss2, string& table, string& column, string& value, const string& tableName, const TableJson& json_table) {
     string indication;
     iss2 >> indication;
 
@@ -54,7 +55,7 @@ bool parseWhereClause(istringstream& iss2, string& table, string& column, string
     }
 
     // Проверка на существование колонки
-    if (!ExistColonk(tableName, column, json_table.Tablehead)) {
+    if (!EXISTCOL(tableName, column, json_table.Tablehead)) {
         cerr << "Такой колонки нет.\n";
         return false;
     }
@@ -77,15 +78,14 @@ bool parseWhereClause(istringstream& iss2, string& table, string& column, string
     value = value.substr(1, value.size() - 2);
     return true;
 }
-
-
-bool deleteRowsFromTable(const string& tableName, const string& column, const string& value, const TableJson& json_table) {
+//Функция DELROWS предназначена для удаления строк из CSV-файлов, которые соответствуют заданному условию.
+bool DELROWS(const string& tableName, const string& column, const string& value, const TableJson& json_table) {
     int amountCsv = 1;
     bool deletedStr = false;
 
     // Ищем все CSV файлы
     while (true) {
-        fs::path filePath = fs::path("/mnt/c/Users/Николай/practice 2/Practice 1.3") / json_table.Name / tableName / (to_string(amountCsv) + ".csv");
+        fs::path filePath = fs::path("/home/yyandh1/localrepos1/practice3.1") / json_table.Name / tableName / (to_string(amountCsv) + ".csv");
         ifstream file(filePath);
         if (!file.is_open()) {
             break;
@@ -96,7 +96,7 @@ bool deleteRowsFromTable(const string& tableName, const string& column, const st
 
     // Просматриваем все CSV файлы
     for (size_t iCsv = 1; iCsv < amountCsv; iCsv++) {
-        string filePath = "/mnt/c/Users/Николай/practice 2/Practice 1.3/" + json_table.Name + "/" + tableName + "/" + (to_string(iCsv) + ".csv");
+        string filePath = "/home/yyandh1/localrepos1/practice3.1/" + json_table.Name + "/" + tableName + "/" + (to_string(iCsv) + ".csv");
         rapidcsv::Document doc(filePath);
 
         int columnIndex = doc.GetColumnIdx(column);
@@ -108,7 +108,6 @@ bool deleteRowsFromTable(const string& tableName, const string& column, const st
         }
 
         // Ищем и удаляем строки с нужным значением
-        // Важно: изменяем цикл, чтобы корректно работать с индексами после удаления строк
         for (size_t i = 0; i < amountRow;) {  // Индекс не увеличивается сразу
             if (doc.GetCell<string>(columnIndex, i) == value) {
                 doc.RemoveRow(i);
@@ -124,9 +123,8 @@ bool deleteRowsFromTable(const string& tableName, const string& column, const st
 
     return deletedStr;
 }
-
-
-void delet(const string& command, const TableJson& json_table) {
+//Функция DELETE реализует команду удаления строк из таблицы в формате SQL, используя предоставленный запрос и структуру данных, описывающую таблицы.
+void DELETE(const string& command, const TableJson& json_table) {
     istringstream iss(command);
     string indication;
 
@@ -138,7 +136,7 @@ void delet(const string& command, const TableJson& json_table) {
 
     string tableName;
     iss >> tableName;
-    if (!TableExist(tableName, json_table.Tablehead)) {
+    if (!EXISTTAB(tableName, json_table.Tablehead)) {
         cerr << "Такой таблицы нет.\n";
         return;
     }
@@ -151,24 +149,24 @@ void delet(const string& command, const TableJson& json_table) {
     }
 
     string table, column, value;
-    if (!parseWhereClause(iss, table, column, value, tableName, json_table)) {
+    if (!CORWHERE(iss, table, column, value, tableName, json_table)) {
         return;  // Ошибка уже выведена в parseWhereClause
     }
 
     // Проверка на блокировку таблицы
-    if (isloker(tableName, json_table.Name)) {
+    if (ISLOCK(tableName, json_table.Name)) {
         cerr << "Таблица заблокирована.\n";
         return;
     }
-    loker(tableName, json_table.Name); // Блокировка таблицы
+    LOCK(tableName, json_table.Name); // Блокировка таблицы
 
     // Попытка удалить строки из всех CSV файлов таблицы
-    bool deletedStr = deleteRowsFromTable(tableName, column, value, json_table);
+    bool deletedStr = DELROWS(tableName, column, value, json_table);
 
     if (!deletedStr) {
         cout << "Указанное значение не найдено.\n";
     }
 
     // Разблокировка таблицы
-    loker(tableName, json_table.Name);
+    LOCK(tableName, json_table.Name);
 }
